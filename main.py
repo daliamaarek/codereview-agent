@@ -28,10 +28,43 @@ def get_pr_metadata(repo, pr_number):
         "deletions":pr.deletions
     }
 
+def get_pr_files(repo, pr_number):
+    pr = github_client.get_repo(repo).get_pull(pr_number)
+    files = pr.get_files()
+    files_response = []
+    for file in files:
+        files_response.append(
+            {
+                "Filename": file.filename,
+                "Diff": file.patch,
+                "FileAdditions":file.additions,
+                "FileDeletions":file.deletions
+            })
+    return files_response
+
+
 tools = [
     {
         "name": "get_pr_metadata",
         "description": "Gets PR Metadata from a PR",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo": {
+                    "type": "string",
+                    "description": "The repo that this PR belongs to"
+                },
+                "pr_number": {
+                    "type": "integer",
+                    "description": "The PR Number that we want to retrieve metadata from"
+                }
+            },
+            "required": ["repo", "pr_number"]
+        }
+    }, 
+     {
+        "name": "get_pr_files",
+        "description": "Gets Files from a PR",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -68,16 +101,27 @@ while response.stop_reason == "tool_use":
     # For each block in a turn (every tool request within a turn)
     tool_results = []
     for block in response.content: 
-        # Execute get_pr_metadata tool, if requested
-        if block.type == "tool_use" and block.name == "get_pr_metadata":
-            repo = block.input["repo"]
-            pr_number = block.input["pr_number"]
-            content = get_pr_metadata(repo, pr_number)
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": block.id,
-                "content": str(content)
-            })
+        if block.type == "tool_use":
+            # Execute get_pr_metadata tool, if requested
+            if block.name == "get_pr_metadata":
+                repo = block.input["repo"]
+                pr_number = block.input["pr_number"]
+                content = get_pr_metadata(repo, pr_number)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": str(content)
+                })
+            # Execute get_pr_files tool, if requested
+            if block.name == "get_pr_files":
+                repo = block.input["repo"]
+                pr_number = block.input["pr_number"]
+                content = get_pr_files(repo, pr_number)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": str(content)
+                })
 
     # Step 3: Append all tools' responses into the message we want to feed into Claude
     messages.append({"role": "assistant", "content": response.content})
