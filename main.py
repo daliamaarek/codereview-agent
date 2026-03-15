@@ -42,6 +42,11 @@ def get_pr_files(repo, pr_number):
             })
     return files_response
 
+def write_pr_comment(repo, pr_number, body, event):
+    pr = github_client.get_repo(repo).get_pull(pr_number)
+    pr.create_review(body=body, event=event)
+    return "Review posted successfully"
+
 
 tools = [
     {
@@ -78,6 +83,38 @@ tools = [
                 }
             },
             "required": ["repo", "pr_number"]
+        }
+    }, 
+      {
+        "name": "write_pr_comment",
+        "description": "Writes Comment on PR",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo": {
+                    "type": "string",
+                    "description": "The repo that this PR belongs to"
+                },
+                "pr_number": {
+                    "type": "integer",
+                    "description": "The PR Number that we want to retrieve metadata from"
+                },
+                "body": {
+                    "type": "string", 
+                    "description": "The comment we want to leave on the PR"
+                }, 
+                "event": {
+                    "type": "string", 
+                    "description": (
+                        f"The action we want to take on this diff. "
+                        f"You can use three actions here: "
+                        f"1. 'COMMENT' - leaves a review comment, no decision. Use this if the PR author is {os.getenv('GITHUB_USERNAME')} "
+                        f"2. 'APPROVE' - approves the PR "
+                        f"3. 'REQUEST_CHANGES' - blocks merging until changes are made" 
+                    )               
+                }
+            },
+            "required": ["repo", "pr_number", "body", "event"]
         }
     }, 
 ]
@@ -122,6 +159,18 @@ while response.stop_reason == "tool_use":
                     "tool_use_id": block.id,
                     "content": str(content)
                 })
+            if block.name == "write_pr_comment":
+                repo = block.input["repo"]
+                pr_number = block.input["pr_number"]
+                body = block.input["body"]
+                event = block.input["event"]
+                content = write_pr_comment(repo, pr_number, body, event)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": str(content)
+                })
+
 
     # Step 3: Append all tools' responses into the message we want to feed into Claude
     messages.append({"role": "assistant", "content": response.content})
@@ -135,5 +184,5 @@ while response.stop_reason == "tool_use":
         messages=messages
     )
 
-    print("Stop reason:", response.stop_reason)
-    print(response.content[0].text)
+print("Stop reason:", response.stop_reason)
+print(response.content[0].text)
