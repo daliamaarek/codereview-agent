@@ -3,6 +3,7 @@ import os
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from github import Github, Auth
+from prompts import SYSTEM_PROMPT
 
 load_dotenv()
 warnings.filterwarnings("ignore")
@@ -10,8 +11,6 @@ warnings.filterwarnings("ignore")
 auth = Auth.Token(os.getenv("GITHUB_TOKEN"))
 github_client = Github(auth=auth)
 anthropic_client = Anthropic()
-
-print("clients loaded!")
 
 def get_pr_metadata(repo, pr_number):
     pr = github_client.get_repo(repo).get_pull(pr_number)
@@ -119,7 +118,7 @@ tools = [
     }, 
 ]
 
-user_input = input("Give me a repo and PR that you want me to review!\n") 
+user_input = input("Hi I'm the Claude Code Review Agent! How can I help you today?\n") 
 messages = [{"role": "user", "content": user_input}]
     
 # Step 1 — First call to Claude
@@ -127,7 +126,8 @@ response = anthropic_client.messages.create(
     model="claude-sonnet-4-20250514",
     max_tokens=1024,
     tools=tools,
-    messages=messages
+    messages=messages,
+    system=SYSTEM_PROMPT, 
 )
 
 #Step 2: For each turn, loop if we need to use a tool 
@@ -181,7 +181,8 @@ while response.stop_reason == "tool_use":
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
         tools=tools,
-        messages=messages
+        messages=messages,
+        system=SYSTEM_PROMPT, 
     )
 
 print("Stop reason:", response.stop_reason)
